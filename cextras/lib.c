@@ -35,7 +35,6 @@ int32_t c__kdri_scan_devices(struct KettlerDevice* device_array, uint32_t max_de
 		exit(1);
 	}
 
-	timeout = 2; // bluez will wait "timeout * 1.28" seconds for inquiry
 	max_rsp = 255; // maximum number of devices that can be found
 	flags = IREQ_CACHE_FLUSH;
 	ii = (inquiry_info*)malloc(max_rsp * sizeof(inquiry_info));
