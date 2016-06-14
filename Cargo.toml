@@ -1,0 +1,16 @@
+[package]
+name = "kdri"
+version = "0.4.0"
+authors = ["Chang Spivey <chang.spivey@gmail.com>"]
+build = "build.rs"
+
+[dependencies]
+bluetooth = { git = "https://github.com/ChangSpivey/bluetooth-rs.git" }
+mio = "0.5"
+enum_primitive = "0.1.0"
+
+[lib]
+name = "kdri"
+
+[build-dependencies]
+gcc = "0.3"
