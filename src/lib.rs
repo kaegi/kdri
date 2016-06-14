@@ -825,9 +825,10 @@ impl KettlerConnection {
 	pub fn get_device_state(&mut self) -> Option<KettlerDeviceState>		{ self.u(); self.kdata.device_state }
 	pub fn get_brake_mode(&mut self) -> Option<KettlerBrakeMode>		    { self.u(); self.kdata.brake_mode }
 
-    pub fn close(&mut self) {
-        self.send_channel.send(KettlerHandlerMsg::Shutdown).expect("Sending shutdown signal to bluetooth socket thread failed");
-		self.join_handle.take().unwrap().join().expect("Joining threads failed");
+    pub fn close(&mut self) -> std::result::Result<(), String> {
+        try!(self.send_channel.send(KettlerHandlerMsg::Shutdown).map_err(|_| "Sending shutdown signal to bluetooth socket thread failed"));
+		try!(self.join_handle.take().unwrap().join().map_err(|_| "Joining threads failed"));
+		Ok(())
     }
 }
 
