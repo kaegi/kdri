@@ -848,6 +848,13 @@ impl KettlerDevice {
         }
     }
 
+	pub fn new(name: String, addr: BtAddr) -> KettlerDevice {
+		KettlerDevice {
+			name: name,
+			addr: addr,
+		}
+	}
+
     pub fn get_name(&self) -> String { self.name.clone() }
     pub fn get_addr(&self) -> BtAddr { self.addr }
 
