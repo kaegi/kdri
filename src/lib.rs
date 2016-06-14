@@ -6,7 +6,8 @@ extern crate mio;
 
 #[macro_use] extern crate enum_primitive;
 
-use bluetooth::{BtAddr, BluetoothSocket, BluetoothProtocol};
+pub use bluetooth::BtAddr;
+use bluetooth::{BluetoothSocket, BluetoothProtocol};
 use std::io::{Read, Write};
 use std::thread::JoinHandle;
 use mio::*;
