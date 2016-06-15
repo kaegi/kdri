@@ -6,10 +6,6 @@
 
 extern const uint8_t* hello_rust();
 
-struct KettlerDevice {
-  uint8_t* name; // null terminated string
-  uint8_t addr[6]; // MAC address of device
-};
 
 typedef void* KettlerConnection;
 

@@ -8,7 +8,10 @@
 #include <bluetooth/sdp.h>
 #include <bluetooth/sdp_lib.h>
 
-#include <kdri.h>
+struct KettlerDevice {
+  uint8_t* name; // null terminated string
+  uint8_t addr[6]; // MAC address of device
+};
 
 #define LENGTH(x) (int32_t)(sizeof(x) / sizeof(x[0]))
 
