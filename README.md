@@ -16,6 +16,7 @@ bluetooth. This includes following models:
 This library is tested on a `RUN 7`. Because there are no platform independent
 bluetooth libraries for Rust (yet), it only runs on BlueZ/Linux.
 
+
 Example
 ---------------
 
@@ -78,3 +79,7 @@ fn main() {
   connection.close();
 }
 ```
+
+Bindings for C
+---------------
+See [kdri-c-wrapper](https://github.com/ChangSpivey/kdri-c-wrapper).
