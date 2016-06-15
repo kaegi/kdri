@@ -29,8 +29,8 @@ use std::str::FromStr;
 fn main() {
   println!("Search for devices...");
 
-  // Scan for all Kettler devices in range. The first argument is the timeout. This function will block for some seconds.
-  let mut devices = kdri::scan_devices(1).expect("Scanning  devices failed");
+  // Scan for all Kettler devices in range. This function will block for some seconds.
+  let mut devices = kdri::scan_devices().expect("Scanning  devices failed");
 
   // Ignore all other devices, just use the last one.
   let device: kdri::KettlerDevice = devices.pop().expect("No devices found");

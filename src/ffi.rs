@@ -35,18 +35,6 @@ pub type intmax_t = ::std::os::raw::c_long;
 pub type uintmax_t = ::std::os::raw::c_ulong;
 
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-#[derive(Debug)]
-pub struct KettlerDeviceC {
-    pub name: *mut ::std::os::raw::c_char,
-    pub addr: [uint8_t; 6usize],
-}
-impl ::std::default::Default for KettlerDeviceC {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
-}
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +44,5 @@ impl ::std::default::Default for KettlerDeviceC {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern "C" {
-    pub fn c__kdri_scan_devices(device_array: *mut KettlerDeviceC, max_devices: uint32_t, timeout: uint32_t) -> int32_t;
-    pub fn c__kdri_free_device(device: *mut KettlerDeviceC);
     pub fn c__get_rfcomm_channel(addr: bluetooth::BtAddr, class16: uint16_t) -> int32_t;
 }

@@ -7,7 +7,7 @@ extern crate mio;
 #[macro_use] extern crate enum_primitive;
 
 pub use bluetooth::BtAddr;
-use bluetooth::{BluetoothSocket, BluetoothProtocol};
+use bluetooth::{BtDevice, BtSocket, BtProtocol, BtError};
 use std::io::{Read, Write};
 use std::thread::JoinHandle;
 use mio::*;
@@ -582,7 +582,7 @@ enum ConnectionMsg {
 }
 
 struct KettlerHandler {
-    socket: BluetoothSocket,
+    socket: BtSocket,
 	send_channel: mpsc::Sender<ConnectionMsg>,
 	update_interval: u32,
 	kvalues_opt: Option<KettlerValues>,
@@ -590,7 +590,7 @@ struct KettlerHandler {
 }
 
 impl KettlerHandler {
-    fn new(socket: BluetoothSocket, send_channel: mpsc::Sender<ConnectionMsg>, update_interval: u32) -> KettlerHandler {
+    fn new(socket: BtSocket, send_channel: mpsc::Sender<ConnectionMsg>, update_interval: u32) -> KettlerHandler {
         KettlerHandler {
             socket: socket,
 			kvalues_opt: None,
@@ -722,7 +722,7 @@ pub struct KettlerConnection {
 }
 impl KettlerConnection {
 
-    fn new(socket: BluetoothSocket) -> KettlerConnection {
+    fn new(socket: BtSocket) -> KettlerConnection {
         // start blocking event loop in different thread but retain a channel for communication
         let mut event_loop = EventLoop::<_>::new().expect("EventLoop::new() failed");
         let send_channel = event_loop.channel();
@@ -844,17 +844,6 @@ pub struct KettlerDevice {
 }
 
 impl KettlerDevice {
-    fn from_kettler_device_c(mut device: KettlerDeviceC) -> KettlerDevice {
-        unsafe {
-            let ret = KettlerDevice {
-                name: std::ffi::CStr::from_ptr(device.name).to_string_lossy().into_owned().clone(),
-                addr: BtAddr(device.addr)
-            };
-            c__kdri_free_device(&mut device); // frees memory for name
-            return ret;
-        }
-    }
-
 	pub fn new(name: String, addr: BtAddr) -> KettlerDevice {
 		KettlerDevice {
 			name: name,
@@ -866,13 +855,13 @@ impl KettlerDevice {
     pub fn get_addr(&self) -> BtAddr { self.addr }
 
     pub fn connect(&self) -> std::result::Result<KettlerConnection, String> {
-        let mut socket = try!(BluetoothSocket::new(BluetoothProtocol::RFCOMM).map_err(|e| e.to_string()));
+        let mut socket = try!(BtSocket::new(BtProtocol::RFCOMM).map_err(|e| e.to_string()));
 
     	// Find rfcomm channel by using SDP (service discovery)
     	// Rfcomm service has class 0x1101.
         let channel = unsafe { c__get_rfcomm_channel(self.addr, 0x1101) };
         if channel < 0 { return Err("RFCOMM service of bluetooth device not found".to_string()); }
-        try!(socket.connect(&self.addr, channel as u8).map_err(|e| e.to_string()));
+        try!(socket.connect(self.addr, channel as u32).map_err(|e| e.to_string()));
 
         let connection = KettlerConnection::new(socket);
         connection.send_handshake();
@@ -880,12 +869,24 @@ impl KettlerDevice {
     }
 }
 
-pub fn scan_devices(timeout: u32) -> Option<Vec<KettlerDevice>> {
-    let mut kettler_devices = Vec::with_capacity(256);
-    unsafe {
-        let num_devices = c__kdri_scan_devices(kettler_devices.as_mut_ptr(), 256, timeout);
-        if num_devices < 0 { return None }
-        kettler_devices.set_len(num_devices as usize);
+impl<'a> std::convert::From<&'a BtDevice> for KettlerDevice {
+
+    fn from(device: &BtDevice) -> KettlerDevice {
+        KettlerDevice {
+            name: device.name.clone(),
+            addr: device.addr,
+        }
     }
-    return Some(kettler_devices.into_iter().map(|device| KettlerDevice::from_kettler_device_c(device)).collect());
+
+}
+
+pub fn scan_devices() -> Result<Vec<KettlerDevice>, BtError> {
+	let bluetooth_devices: Vec<BtDevice> = try!(bluetooth::scan_devices());
+	println!("{} devices", bluetooth_devices.len());
+	let prefixes = vec!["TOUR", "RACER", "ERGO", "RECUMBENT", "UNIX", "SKYLON", "RUN", "TRACK"];
+	Ok(bluetooth_devices.iter()
+						.inspect(|device| println!("{:?}", device))
+						.filter(|device: &&BtDevice| prefixes.iter().any(|prefix| device.name.starts_with(prefix)))
+						.map(|device: &BtDevice| From::from(device))
+						.collect())
 }
