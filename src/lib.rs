@@ -885,7 +885,6 @@ pub fn scan_devices() -> Result<Vec<KettlerDevice>, BtError> {
 	println!("{} devices", bluetooth_devices.len());
 	let prefixes = vec!["TOUR", "RACER", "ERGO", "RECUMBENT", "UNIX", "SKYLON", "RUN", "TRACK"];
 	Ok(bluetooth_devices.iter()
-						.inspect(|device| println!("{:?}", device))
 						.filter(|device: &&BtDevice| prefixes.iter().any(|prefix| device.name.starts_with(prefix)))
 						.map(|device: &BtDevice| From::from(device))
 						.collect())
