@@ -14,6 +14,12 @@ use mio::*;
 use enum_primitive::FromPrimitive;
 use std::sync::mpsc;
 
+macro_rules! try_msg {
+	($e:expr, $m:expr) => {
+		try!($e.map_err(|err| format!("{}: {:?}", $m, err)))
+	}
+}
+
 fn bytes_to_string(b: &[u8]) -> String {
 	b.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(":")
 }
@@ -826,8 +832,8 @@ impl KettlerConnection {
 	pub fn get_brake_mode(&mut self) -> Option<KettlerBrakeMode>		    { self.u(); self.kdata.brake_mode }
 
     pub fn close(&mut self) -> std::result::Result<(), String> {
-        try!(self.send_channel.send(KettlerHandlerMsg::Shutdown).map_err(|_| "Sending shutdown signal to bluetooth socket thread failed"));
-		try!(self.join_handle.take().unwrap().join().map_err(|_| "Joining threads failed"));
+        try_msg!(self.send_channel.send(KettlerHandlerMsg::Shutdown), "Sending shutdown signal to bluetooth socket thread failed");
+		try_msg!(self.join_handle.take().unwrap().join(), "Joining threads failed");
 		Ok(())
     }
 }
