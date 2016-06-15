@@ -882,7 +882,6 @@ impl<'a> std::convert::From<&'a BtDevice> for KettlerDevice {
 
 pub fn scan_devices() -> Result<Vec<KettlerDevice>, BtError> {
 	let bluetooth_devices: Vec<BtDevice> = try!(bluetooth::scan_devices());
-	println!("{} devices", bluetooth_devices.len());
 	let prefixes = vec!["TOUR", "RACER", "ERGO", "RECUMBENT", "UNIX", "SKYLON", "RUN", "TRACK"];
 	Ok(bluetooth_devices.iter()
 						.filter(|device: &&BtDevice| prefixes.iter().any(|prefix| device.name.starts_with(prefix)))
