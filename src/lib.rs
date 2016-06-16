@@ -1,4 +1,3 @@
-mod ffi; use ffi::*;
 mod crc; use crc::*;
 
 extern crate bluetooth;
@@ -857,11 +856,7 @@ impl KettlerDevice {
     pub fn connect(&self) -> std::result::Result<KettlerConnection, String> {
         let mut socket = try!(BtSocket::new(BtProtocol::RFCOMM).map_err(|e| e.to_string()));
 
-    	// Find rfcomm channel by using SDP (service discovery)
-    	// Rfcomm service has class 0x1101.
-        let channel = unsafe { c__get_rfcomm_channel(self.addr, 0x1101) };
-        if channel < 0 { return Err("RFCOMM service of bluetooth device not found".to_string()); }
-        try!(socket.connect(self.addr, channel as u32).map_err(|e| e.to_string()));
+        try!(socket.connect_rfcomm(self.addr).map_err(|e| e.to_string()));
 
         let connection = KettlerConnection::new(socket);
         connection.send_handshake();
