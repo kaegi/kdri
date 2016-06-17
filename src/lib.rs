@@ -678,8 +678,15 @@ impl KettlerHandler {
 			_ => {
 				println!("E: using generic profile for Kettler device {:?} in module {} file {} line {}", device_type, module_path!(), file!(), line!());
 				(
-					vec![Rpm, BrakeMode, BrakeLevel, PowerSet, PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange],
-					vec![SpeedMin, SpeedMax, InclineMin, InclineMax, PowerMin, PowerMax, BrakeLevelMin, BrakeLevelMax]
+					vec![Rpm,
+						 BrakeMode, BrakeLevel, BrakeLevelMin, BrakeLevelMax,
+						 PowerSet, PowerGet, InPowerRange,
+						 SpeedGet, SpeedSet,
+						 InclineGet, InclineSet],
+					vec![SpeedMin, SpeedMax,
+						 InclineMin, InclineMax,
+						 PowerMin, PowerMax,
+						 BrakeLevelMin, BrakeLevelMax]
 				)
 			}
 		};
@@ -762,7 +769,10 @@ impl mio::Handler for KettlerHandler {
 
 /// Manages a connection to a device. All important functions are located here.
 ///
-///
+/// All `get_*()` and `set_*()` functions are non-blocking.
+/// The `get_*()` functions will return a None if the value is not initialized (yet). A short time
+/// after connecting to the device, `DeviceType` will be requested and initialized, and then
+/// all supported values for this device will follow.
 pub struct KettlerConnection {
     send_channel: mio::Sender<KettlerHandlerMsg>,
 	recv_channel: mpsc::Receiver<ConnectionMsg>,
@@ -857,12 +867,78 @@ impl KettlerConnection {
 		self.update();
 	}
 
+	/// Documentation missing!
+	///
+	/// Supported on:
+	///
+	/// Not supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
     pub fn set_power(&mut self, v: u16)	                    { self.send_instruction_u16(KettlerValue::PowerSet, KettlerInstruction::Write, v); }
+
+	/// Set speed in `0.1km/h` steps.
+	///
+	/// Supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
+	/// Not supported on:
+	///
     pub fn set_speed(&mut self, v: u16)		                { self.send_instruction_u16(KettlerValue::SpeedSet, KettlerInstruction::Write, v); }
+
+	/// Set inclination of treadmill. Only steps of 5 are accepted (5, 10, 15, ...), otherwise they
+	/// will be rounded down (13 -> 10). The real inclination is one tenth of this value. So setting
+	/// this value to 10 will display 1.0 on the display of the device.
+	///
+	/// Supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
+	/// Not supported on:
+	///
     pub fn set_incline(&mut self, v: u16)	                { self.send_instruction_u16(KettlerValue::InclineSet, KettlerInstruction::Write, v); }
+
+	/// Documentation missing!
+	///
+	/// Supported on:
+	///
+	/// Not supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
     pub fn set_brake_level(&mut self, v: u8)	            { self.send_instruction_u8(KettlerValue::BrakeLevel, KettlerInstruction::Write, v); }
+
+	/// Documentation missing!
+	///
+	/// Supported on:
+	///
+	/// Not supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
     pub fn set_brake_mode(&mut self, v: KettlerBrakeMode)	{ self.send_instruction_u8(KettlerValue::BrakeMode, KettlerInstruction::Write, v as u8); }
+
+	/// Start/stop the device.
+	///
+	/// Setting online to `true` will start a countdown from 3 on the device. During this countdown
+	/// (and shortly after), the setting of other values will be ignored.
+	/// Setting online to `false` will pause/stop the device. The values for `distance` and `energy`
+	/// will be retained for 5 minutes. Setting online to `false` in this state a second time will
+	/// erase these values, as well as waiting these 5 minutes.
+	///
+	/// Supported on:
+	///
+	///  - treadmills (`RUN`)
+	///
+	/// Not supported on:
+	///
     pub fn set_online(&mut self, v: bool)	                { self.send_instruction_u8(KettlerValue::Online, KettlerInstruction::Write, !v as u8); }
+
+
+	/// Set the refresh rate of the values in milliseconds.
+	///
+	/// Supported on all devices because it is a feature of the library.
 	pub fn set_update_interval(&mut self, v: u32)			{ self.update_interval = v; self.send_message(KettlerHandlerMsg::SetUpdateInterval(v)); }
 
 	pub fn get_power_target(&mut self) -> Option<u16>		                { self.u(); self.kdata.power_target }
