@@ -31,14 +31,14 @@
 
 mod crc; use crc::*;
 
-extern crate bluetooth;
+extern crate bluetooth_serial_port;
 extern crate mio;
 
 #[macro_use] extern crate enum_primitive;
 
-pub use bluetooth::BtAddr;
+pub use bluetooth_serial_port::BtAddr;
 pub use enum_primitive::FromPrimitive;
-use bluetooth::{BtDevice, BtSocket, BtProtocol, BtError};
+use bluetooth_serial_port::{BtDevice, BtSocket, BtProtocol, BtError};
 use std::io::{Read, Write};
 use std::thread::JoinHandle;
 use mio::*;
@@ -1015,7 +1015,7 @@ impl<'a> std::convert::From<&'a BtDevice> for KettlerDevice {
 
 /// Return a vector of Kettler devices you can connect to.
 pub fn scan_devices() -> Result<Vec<KettlerDevice>, BtError> {
-	let bluetooth_devices: Vec<BtDevice> = try!(bluetooth::scan_devices());
+	let bluetooth_devices: Vec<BtDevice> = try!(bluetooth_serial_port::scan_devices());
 	let prefixes = vec!["TOUR", "RACER", "ERGO", "RECUMBENT", "UNIX", "SKYLON", "RUN", "TRACK"];
 	Ok(bluetooth_devices.iter()
 						.filter(|device: &&BtDevice| prefixes.iter().any(|prefix| device.name.starts_with(prefix)))

@@ -5,7 +5,7 @@ authors = ["Chang Spivey <chang.spivey@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-bluetooth = { git = "https://github.com/ChangSpivey/bluetooth-rs.git" }
+bluetooth-serial-port = { git = "https://github.com/ChangSpivey/bluetooth-serial-port.git" }
 mio = "0.5"
 enum_primitive = "0.1.0"
 
