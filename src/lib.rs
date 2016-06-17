@@ -241,8 +241,8 @@ impl KettlerPackageAnalyzer {
 		}
 	}
 
-	fn error(&mut self, byte: u8) -> KettlerPackageAnalyzerResult {
-		println!("E: unexpected character '0x{:02X}'", byte);
+	fn error(&mut self, _: u8) -> KettlerPackageAnalyzerResult {
+		//println!("E: unexpected character '0x{:02X}'", byte);
 		self.reset();
 		return KettlerPackageAnalyzerResult::Clear;
 	}
@@ -390,17 +390,11 @@ impl KettlerDataManager {
 	}
 
     fn process_read_channel(&mut self) {
-		//println!("Bytes received {:?}", Self::bytes_to_string(&self.read_channel));
-		// ensure that the byte sequence starts with an 0x02 or is empty
-		//println!("read channel {}", bytes_to_string(&self.read_channel));
 		while self.read_channel_cursor < self.read_channel.len() {
 			self.read_channel_cursor += 1;
 			match self.package_analyzer.next_byte(self.read_channel[self.read_channel_cursor - 1]) {
 				KettlerPackageAnalyzerResult::Nothing => { }
-				KettlerPackageAnalyzerResult::Clear => {
-					println!("W: drain package {}", bytes_to_string(&self.read_channel.drain(0..self.read_channel_cursor).collect::<Vec<u8>>()));
-					self.read_channel_cursor = 0;
-				}
+				KettlerPackageAnalyzerResult::Clear => { self.read_channel_cursor = 0; }
 				KettlerPackageAnalyzerResult::Package(package) => {
 					self.read_channel.drain(0..self.read_channel_cursor);
 					self.read_channel_cursor = 0;
