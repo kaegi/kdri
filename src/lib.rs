@@ -132,12 +132,15 @@ enum KettlerInstruction {
 
 #[derive(Default, Clone, Debug)]
 struct KettlerDeviceData {
+	power_target:    Option<u16>,
 	power:           Option<u16>,
 	power_min:       Option<u16>,
 	power_max:       Option<u16>,
+	speed_target:    Option<u16>,
 	speed:           Option<u16>,
 	speed_min:       Option<u16>,
 	speed_max:       Option<u16>,
+	incline_target:  Option<u16>,
 	incline:         Option<u16>,
 	incline_min:     Option<u16>,
 	incline_max:     Option<u16>,
@@ -181,12 +184,15 @@ impl KettlerDeviceData {
 			Pulse           => self.pulse.is_some(),
 			Rpm             => self.rpm.is_some(),
 			Online          => self.online.is_some(),
+			SpeedSet        => self.speed_target.is_some(),
 			SpeedGet        => self.speed.is_some(),
 			SpeedMin        => self.speed_min.is_some(),
 			SpeedMax        => self.speed_max.is_some(),
+			InclineSet      => self.incline_target.is_some(),
 			InclineGet      => self.incline.is_some(),
 			InclineMin      => self.incline_min.is_some(),
 			InclineMax      => self.incline_max.is_some(),
+			PowerSet        => self.power_target.is_some(),
 			PowerGet        => self.power.is_some(),
 			PowerMin        => self.power_min.is_some(),
 			PowerMax        => self.power_max.is_some(),
@@ -197,7 +203,7 @@ impl KettlerDeviceData {
 			BrakeLevel      => self.brake_level.is_some(),
 			BrakeLevelMin   => self.brake_level_min.is_some(),
 			BrakeLevelMax   => self.brake_level_max.is_some(),
-			Speed /* deprecated */ | SpeedSet | PowerSet | InclineSet => { true }
+			Speed /* deprecated */ => { true }
 		}
 	}
 }
@@ -360,12 +366,15 @@ impl KettlerDataManager {
 			Pulse           => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.pulse           = Some(i); } }
 			Rpm             => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.rpm             = Some(i); } }
 			Online          => { if let Some(i) = Self::parse_bool_u8(additional_data)               { self.kdata.online          = Some(i); } }
+			SpeedSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_target    = Some(i); } }
 			SpeedGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed           = Some(i); } }
 			SpeedMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_min       = Some(i); } }
 			SpeedMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_max       = Some(i); } }
+			InclineSet      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_target  = Some(i); } }
 			InclineGet      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline         = Some(i); } }
 			InclineMin      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_min     = Some(i); } }
 			InclineMax      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_max     = Some(i); } }
+			PowerSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_target    = Some(i); } }
 			PowerGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power           = Some(i); } }
 			PowerMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_min       = Some(i); } }
 			PowerMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_max       = Some(i); } }
@@ -376,7 +385,7 @@ impl KettlerDataManager {
 			BrakeLevel      => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level     = Some(i); } }
 			BrakeLevelMin   => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level_min = Some(i); } }
 			BrakeLevelMax   => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level_max = Some(i); } }
-			Speed /* deprecated */ | SpeedSet | PowerSet | InclineSet => { println!("W: unexpected value {:?} received", value); }
+			Speed /* deprecated */ => { println!("W: unexpected value {:?} received", value); }
 		}
 	}
 
@@ -624,14 +633,14 @@ impl KettlerHandler {
 		let device_type = self.data_manager.kdata.device_type.expect("device type is not initialized");
 		let (mut d, mut s) = match device_type {
 			Treadmill => (
-				vec![SpeedGet, InclineGet],
+				vec![SpeedGet, SpeedSet, InclineGet, InclineSet],
 				vec![SpeedMin, SpeedMax, InclineMin, InclineMax]
 			),
 			// TODO: different profiles for crosstrainer, racer, ....
 			_ => {
 				println!("E: using generic profile for Kettler device {:?} in module {} file {} line {}", device_type, module_path!(), file!(), line!());
 				(
-					vec![DeviceState, PowerGet, SpeedGet, InclineGet, InPowerRange, BrakeLevel],
+					vec![DeviceState, PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange, BrakeLevel],
 					vec![SpeedMin, SpeedMax, InclineMin, InclineMax, PowerMin, PowerMax, BrakeLevelMin, BrakeLevelMax]
 				)
 			}
@@ -804,12 +813,15 @@ impl KettlerConnection {
     pub fn set_online(&mut self, v: bool)	                { self.send_instruction_u8(KettlerValue::Online, KettlerInstruction::Write, !v as u8); }
 	pub fn set_update_interval(&mut self, v: u32)			{ self.send_message(KettlerHandlerMsg::SetUpdateInterval(v)); }
 
+	pub fn get_power_target(&mut self) -> Option<u16>		                { self.u(); self.kdata.power_target }
 	pub fn get_power(&mut self) -> Option<u16>				                { self.u(); self.kdata.power }
 	pub fn get_power_min(&mut self) -> Option<u16>		                    { self.u(); self.kdata.power_min }
 	pub fn get_power_max(&mut self) -> Option<u16>		                    { self.u(); self.kdata.power_max }
+	pub fn get_speed_target(&mut self) -> Option<u16>				        { self.u(); self.kdata.speed_target }
 	pub fn get_speed(&mut self) -> Option<u16>				                { self.u(); self.kdata.speed }
 	pub fn get_speed_min(&mut self) -> Option<u16>			                { self.u(); self.kdata.speed_min }
 	pub fn get_speed_max(&mut self) -> Option<u16>			                { self.u(); self.kdata.speed_max }
+	pub fn get_incline_target(&mut self) -> Option<u16>				        { self.u(); self.kdata.incline_target }
 	pub fn get_incline(&mut self) -> Option<u16>			                { self.u(); self.kdata.incline }
 	pub fn get_incline_min(&mut self) -> Option<u16>		                { self.u(); self.kdata.incline_min }
 	pub fn get_incline_max(&mut self) -> Option<u16>		                { self.u(); self.kdata.incline_max }
