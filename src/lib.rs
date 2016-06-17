@@ -37,11 +37,11 @@ extern crate mio;
 #[macro_use] extern crate enum_primitive;
 
 pub use bluetooth::BtAddr;
+pub use enum_primitive::FromPrimitive;
 use bluetooth::{BtDevice, BtSocket, BtProtocol, BtError};
 use std::io::{Read, Write};
 use std::thread::JoinHandle;
 use mio::*;
-use enum_primitive::FromPrimitive;
 use std::sync::mpsc;
 
 macro_rules! try_msg {
@@ -665,7 +665,7 @@ impl KettlerHandler {
 		use KettlerValue::*;
 		use KettlerDeviceType::*;
 
-		ret.dynamic.append(&mut vec![Pulse, Distance, Energy, Time, TimeMode, Online, DeviceState, BrakeLevel]);
+		ret.dynamic.append(&mut vec![Pulse, Distance, Energy, Time, TimeMode, Online, DeviceState]);
 		ret.static_values.append(&mut vec![DeviceName, DeviceId, DeviceType]);
 
 		let device_type = self.data_manager.kdata.device_type.expect("device type is not initialized");
@@ -678,7 +678,7 @@ impl KettlerHandler {
 			_ => {
 				println!("E: using generic profile for Kettler device {:?} in module {} file {} line {}", device_type, module_path!(), file!(), line!());
 				(
-					vec![PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange],
+					vec![Rpm, BrakeMode, BrakeLevel, PowerSet, PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange],
 					vec![SpeedMin, SpeedMax, InclineMin, InclineMax, PowerMin, PowerMax, BrakeLevelMin, BrakeLevelMax]
 				)
 			}
@@ -885,8 +885,8 @@ impl KettlerConnection {
 	pub fn get_rpm(&mut self) -> Option<u16>		                        { self.u(); self.kdata.rpm }
 	pub fn get_distance(&mut self) -> Option<u16>		                    { self.u(); self.kdata.distance }
 	pub fn get_energy(&mut self) -> Option<u16>		                        { self.u(); self.kdata.energy }
-	pub fn get_time(&mut self) -> Option<u16>		                        { self.u(); self.kdata.energy }
-	pub fn get_time_mode(&mut self) -> Option<u16>		                    { self.u(); self.kdata.energy }
+	pub fn get_time(&mut self) -> Option<u16>		                        { self.u(); self.kdata.time }
+	pub fn get_time_mode(&mut self) -> Option<u16>		                    { self.u(); self.kdata.time_mode }
 	pub fn get_device_name(&mut self) -> Option<String>		                { self.u(); self.kdata.device_name.clone() }
 	pub fn get_device_id(&mut self) -> Option<String>		                { self.u(); self.kdata.device_id.clone() }
 	pub fn get_power_range(&mut self) -> Option<KettlerPowerRange>		    { self.u(); self.kdata.power_range }
