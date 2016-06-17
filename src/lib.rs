@@ -1,3 +1,34 @@
+// #![deny(missing_docs,
+//         missing_debug_implementations, missing_copy_implementations,
+//         trivial_casts, trivial_numeric_casts,
+//         unsafe_code,
+//         unstable_features,
+//         unused_import_braces, unused_qualifications)]
+
+//! A library to control Kettler devices via bluetooth.
+//!
+//! It provides suppport follwing devices
+//!
+//! - `TOUR`
+//! - `RACER`
+//! - `ERGO`
+//! - `RECUMBENT`
+//! - `UNIX`
+//! - `SKYLON`
+//! - `RUN`
+//! - `TRACK`
+//!
+//! Everything was tested only on a `RUN 7`, so information for other models is highly
+//! appreciated!
+//!
+//! # Internal Information
+//!
+//! A bluetooth socket using the `RFCOMM` protocol is created and handled in a `mio::EventLoop`.
+//! The Kettler protocol basically works through requesting a value like speed, and reading the
+//! following response from the device. This leads to the need of requesting the values
+//! after a time, because the last values might be outdated. The default speed of refreshing is
+//! `100ms` but can be changed by using `set_update_interval()`.
+
 mod crc; use crc::*;
 
 extern crate bluetooth;
@@ -23,14 +54,14 @@ fn bytes_to_string(b: &[u8]) -> String {
 	b.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(":")
 }
 
-fn from_u8<T: FromPrimitive>(i: u8) -> std::result::Result<T, u8> {
+fn from_u8<T: FromPrimitive>(i: u8) -> Result<T, u8> {
 	match T::from_u8(i) {
 		Some(x) => Ok(x),
 		None => Err(i),
 	}
 }
 
-fn from_u16<T: FromPrimitive>(i: u16) -> std::result::Result<T, u16> {
+fn from_u16<T: FromPrimitive>(i: u16) -> Result<T, u16> {
 	match T::from_u16(i) {
 		Some(x) => Ok(x),
 		None => Err(i),
@@ -38,7 +69,12 @@ fn from_u16<T: FromPrimitive>(i: u16) -> std::result::Result<T, u16> {
 }
 
 enum_from_primitive! {
+/// Specifies type of Kettler device.
+///
+/// Dependent on the type of the device, a set of values can be requested from it. (`get_rpm()` for
+/// treadmill will not work)
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[allow(missing_docs)]
 pub enum KettlerDeviceType {
 	Bike = 1,
 	Crosstrainer = 2,
@@ -48,7 +84,11 @@ pub enum KettlerDeviceType {
 }
 }
 
+#[allow(missing_docs)]
 enum_from_primitive! {
+/// Can be `Up` or `Down`.
+///
+/// Documenting their meanings is appreciated!
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum KettlerDeviceState {
 	Up = 0,
@@ -57,6 +97,9 @@ pub enum KettlerDeviceState {
 }
 
 enum_from_primitive! {
+/// Can be `Power` or `Brake` (untested, probably for bikes).
+///
+/// Documenting their effects is appreciated!
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum KettlerBrakeMode {
 	ConstantPower = 0,
@@ -65,6 +108,9 @@ pub enum KettlerBrakeMode {
 }
 
 enum_from_primitive! {
+/// You can be `Below`, `In` and `Above` a specific power range (untested).
+///
+/// Documenting their meanings is appreciated!
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum KettlerPowerRange {
 	Below = 0,
@@ -74,9 +120,7 @@ pub enum KettlerPowerRange {
 }
 
 enum_from_primitive! {
-/*
-   Values that can be read or set on Kettler device.
-*/
+/// Values that can be read or set on Kettler device.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum KettlerValue {
 	DeviceState = 6,
@@ -621,7 +665,7 @@ impl KettlerHandler {
 		use KettlerValue::*;
 		use KettlerDeviceType::*;
 
-		ret.dynamic.append(&mut vec![Pulse, Distance, Energy, Time, TimeMode, Online]);
+		ret.dynamic.append(&mut vec![Pulse, Distance, Energy, Time, TimeMode, Online, DeviceState, BrakeLevel]);
 		ret.static_values.append(&mut vec![DeviceName, DeviceId, DeviceType]);
 
 		let device_type = self.data_manager.kdata.device_type.expect("device type is not initialized");
@@ -634,7 +678,7 @@ impl KettlerHandler {
 			_ => {
 				println!("E: using generic profile for Kettler device {:?} in module {} file {} line {}", device_type, module_path!(), file!(), line!());
 				(
-					vec![DeviceState, PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange, BrakeLevel],
+					vec![PowerGet, SpeedGet, SpeedSet, InclineGet, InclineSet, InPowerRange],
 					vec![SpeedMin, SpeedMax, InclineMin, InclineMax, PowerMin, PowerMax, BrakeLevelMin, BrakeLevelMax]
 				)
 			}
@@ -716,23 +760,36 @@ impl mio::Handler for KettlerHandler {
 }
 
 
+/// Manages a connection to a device. All important functions are located here.
+///
+///
 pub struct KettlerConnection {
     send_channel: mio::Sender<KettlerHandlerMsg>,
 	recv_channel: mpsc::Receiver<ConnectionMsg>,
 	kdata: KettlerDeviceData,
 	join_handle: Option<JoinHandle<()>>,
+	update_interval: u32,
 }
 impl KettlerConnection {
 
+	pub fn connect(addr: BtAddr) -> Result<KettlerConnection, String> {
+		let mut socket = try!(BtSocket::new(BtProtocol::RFCOMM).map_err(|e| e.to_string()));
+		try!(socket.connect_rfcomm(addr).map_err(|e| e.to_string()));
+		let connection = KettlerConnection::new(socket);
+		connection.send_handshake();
+		Ok(connection)
+	}
+
     fn new(socket: BtSocket) -> KettlerConnection {
         // start blocking event loop in different thread but retain a channel for communication
+		let update_interval = 100u32;
         let mut event_loop = EventLoop::<_>::new().expect("EventLoop::new() failed");
         let send_channel = event_loop.channel();
 		let (tx, recv_channel): (mpsc::Sender<ConnectionMsg>, mpsc::Receiver<ConnectionMsg>) = mpsc::channel();
         let join_handle = std::thread::spawn(move || {
 			event_loop.timeout_ms((), 10).expect("Registering first timer failed");
 			event_loop.register(&socket, Token(1), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).expect("Registering read event failed");
-            event_loop.run(&mut KettlerHandler::new(socket, tx, 100)).expect("EventLoop::run() failed");
+            event_loop.run(&mut KettlerHandler::new(socket, tx, update_interval)).expect("EventLoop::run() failed");
         });
 
         let connection = KettlerConnection {
@@ -740,6 +797,7 @@ impl KettlerConnection {
 			recv_channel: recv_channel,
 			kdata: Default::default(),
 			join_handle: Some(join_handle),
+			update_interval: update_interval,
         };
 
         connection
@@ -805,7 +863,7 @@ impl KettlerConnection {
     pub fn set_brake_level(&mut self, v: u8)	            { self.send_instruction_u8(KettlerValue::BrakeLevel, KettlerInstruction::Write, v); }
     pub fn set_brake_mode(&mut self, v: KettlerBrakeMode)	{ self.send_instruction_u8(KettlerValue::BrakeMode, KettlerInstruction::Write, v as u8); }
     pub fn set_online(&mut self, v: bool)	                { self.send_instruction_u8(KettlerValue::Online, KettlerInstruction::Write, !v as u8); }
-	pub fn set_update_interval(&mut self, v: u32)			{ self.send_message(KettlerHandlerMsg::SetUpdateInterval(v)); }
+	pub fn set_update_interval(&mut self, v: u32)			{ self.update_interval = v; self.send_message(KettlerHandlerMsg::SetUpdateInterval(v)); }
 
 	pub fn get_power_target(&mut self) -> Option<u16>		                { self.u(); self.kdata.power_target }
 	pub fn get_power(&mut self) -> Option<u16>				                { self.u(); self.kdata.power }
@@ -835,6 +893,7 @@ impl KettlerConnection {
 	pub fn get_device_type(&mut self) -> Option<KettlerDeviceType>		    { self.u(); self.kdata.device_type }
 	pub fn get_device_state(&mut self) -> Option<KettlerDeviceState>		{ self.u(); self.kdata.device_state }
 	pub fn get_brake_mode(&mut self) -> Option<KettlerBrakeMode>		    { self.u(); self.kdata.brake_mode }
+	pub fn get_update_interval(&mut self) -> u32							{ self.update_interval }
 
     pub fn close(&mut self) -> std::result::Result<(), String> {
         try_msg!(self.send_channel.send(KettlerHandlerMsg::Shutdown), "Sending shutdown signal to bluetooth socket thread failed");
@@ -844,8 +903,8 @@ impl KettlerConnection {
 }
 
 pub struct KettlerDevice {
-    name: String,
-    addr: BtAddr,
+    pub name: String,
+    pub addr: BtAddr,
 }
 
 impl KettlerDevice {
@@ -860,13 +919,7 @@ impl KettlerDevice {
     pub fn get_addr(&self) -> BtAddr { self.addr }
 
     pub fn connect(&self) -> std::result::Result<KettlerConnection, String> {
-        let mut socket = try!(BtSocket::new(BtProtocol::RFCOMM).map_err(|e| e.to_string()));
-
-        try!(socket.connect_rfcomm(self.addr).map_err(|e| e.to_string()));
-
-        let connection = KettlerConnection::new(socket);
-        connection.send_handshake();
-        Ok(connection)
+		KettlerConnection::connect(self.addr)
     }
 }
 
@@ -881,6 +934,7 @@ impl<'a> std::convert::From<&'a BtDevice> for KettlerDevice {
 
 }
 
+/// Return a vector of Kettler devices you can connect to.
 pub fn scan_devices() -> Result<Vec<KettlerDevice>, BtError> {
 	let bluetooth_devices: Vec<BtDevice> = try!(bluetooth::scan_devices());
 	let prefixes = vec!["TOUR", "RACER", "ERGO", "RECUMBENT", "UNIX", "SKYLON", "RUN", "TRACK"];
