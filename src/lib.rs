@@ -438,7 +438,10 @@ impl KettlerDataManager {
 			self.read_channel_cursor += 1;
 			match self.package_analyzer.next_byte(self.read_channel[self.read_channel_cursor - 1]) {
 				KettlerPackageAnalyzerResult::Nothing => { }
-				KettlerPackageAnalyzerResult::Clear => { self.read_channel_cursor = 0; }
+				KettlerPackageAnalyzerResult::Clear => {
+					self.read_channel.drain(0..self.read_channel_cursor);
+					self.read_channel_cursor = 0;
+				 }
 				KettlerPackageAnalyzerResult::Package(package) => {
 					self.read_channel.drain(0..self.read_channel_cursor);
 					self.read_channel_cursor = 0;
