@@ -409,7 +409,7 @@ impl KettlerDataManager {
 			InPowerRange    => { if let Some(i) = Self::parse_power_range(additional_data)           { self.kdata.power_range     = Some(i); } }
 			Pulse           => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.pulse           = Some(i); } }
 			Rpm             => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.rpm             = Some(i); } }
-			Online          => { if let Some(i) = Self::parse_bool_u8(additional_data)               { self.kdata.online          = Some(i); } }
+			Online          => { if let Some(i) = Self::parse_bool_u8(additional_data)               { self.kdata.online          = Some(!i); } }
 			SpeedSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_target    = Some(i); } }
 			SpeedGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed           = Some(i); } }
 			SpeedMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_min       = Some(i); } }
