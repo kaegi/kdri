@@ -38,11 +38,11 @@ extern crate mio;
 
 pub use bluetooth_serial_port::BtAddr;
 pub use enum_primitive::FromPrimitive;
+use std::sync::{RwLock, Arc};
 use bluetooth_serial_port::{BtDevice, BtSocket, BtProtocol, BtError};
 use std::io::{Read, Write};
 use std::thread::JoinHandle;
 use mio::*;
-use std::sync::mpsc;
 
 macro_rules! try_msg {
 	($e:expr, $m:expr) => {
@@ -351,19 +351,19 @@ struct KettlerDataManager {
     read_channel: Vec<u8>,
 	read_channel_cursor: usize,
 	crc: CRC,
-	kdata: KettlerDeviceData,
+	kdata_mutex: Arc<RwLock<KettlerDeviceData>>,
 	package_analyzer: KettlerPackageAnalyzer,
 }
 
 impl KettlerDataManager {
-	fn new() -> KettlerDataManager {
+	fn new(kdata_mutex: Arc<RwLock<KettlerDeviceData>>) -> KettlerDataManager {
 		KettlerDataManager {
             read_buffer: std::vec::from_elem(0xAE, 2048),
             read_channel: Vec::new(),
 			read_channel_cursor: 0,
 			write_channel: Vec::new(),
 			crc: CRC::new(),
-			kdata: KettlerDeviceData::default(),
+			kdata_mutex: kdata_mutex,
 			package_analyzer: KettlerPackageAnalyzer::new(),
 		}
 	}
@@ -400,35 +400,36 @@ impl KettlerDataManager {
 		if instruction != KettlerInstruction::Answer { println!("W: expected KettlerInstruction::Answer"); return; }
 
 		use KettlerValue::*;
+		let mut kdata = self.kdata_mutex.write().unwrap();
 		match value {
-			DeviceName      => { if let Some(i) = Self::parse_string(additional_data)                { self.kdata.device_name     = Some(i); } }
-			DeviceId        => { if let Some(i) = Self::parse_string(additional_data)                { self.kdata.device_id       = Some(i); } }
-			DeviceType      => { if let Some(i) = Self::parse_device_type(additional_data)           { self.kdata.device_type     = Some(i); } }
-			BrakeMode 		=> { if let Some(i) = Self::parse_device_brake_mode(additional_data)     { self.kdata.brake_mode      = Some(i); } }
-			DeviceState     => { if let Some(i) = Self::parse_device_state(additional_data)          { self.kdata.device_state    = Some(i); } }
-			InPowerRange    => { if let Some(i) = Self::parse_power_range(additional_data)           { self.kdata.power_range     = Some(i); } }
-			Pulse           => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.pulse           = Some(i); } }
-			Rpm             => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.rpm             = Some(i); } }
-			Online          => { if let Some(i) = Self::parse_bool_u8(additional_data)               { self.kdata.online          = Some(!i); } }
-			SpeedSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_target    = Some(i); } }
-			SpeedGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed           = Some(i); } }
-			SpeedMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_min       = Some(i); } }
-			SpeedMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.speed_max       = Some(i); } }
-			InclineSet      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_target  = Some(i); } }
-			InclineGet      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline         = Some(i); } }
-			InclineMin      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_min     = Some(i); } }
-			InclineMax      => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.incline_max     = Some(i); } }
-			PowerSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_target    = Some(i); } }
-			PowerGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power           = Some(i); } }
-			PowerMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_min       = Some(i); } }
-			PowerMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.power_max       = Some(i); } }
-			Distance        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.distance        = Some(i); } }
-			Energy          => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.energy          = Some(i); } }
-			Time            => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.time            = Some(i); } }
-			TimeMode        => { if let Some(i) = Self::parse_u16(additional_data)                   { self.kdata.time_mode       = Some(i); } }
-			BrakeLevel      => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level     = Some(i); } }
-			BrakeLevelMin   => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level_min = Some(i); } }
-			BrakeLevelMax   => { if let Some(i) = Self::parse_u8(additional_data)                    { self.kdata.brake_level_max = Some(i); } }
+			DeviceName      => { if let Some(i) = Self::parse_string(additional_data)                { kdata.device_name     = Some(i); } }
+			DeviceId        => { if let Some(i) = Self::parse_string(additional_data)                { kdata.device_id       = Some(i); } }
+			DeviceType      => { if let Some(i) = Self::parse_device_type(additional_data)           { kdata.device_type     = Some(i); } }
+			BrakeMode 		=> { if let Some(i) = Self::parse_device_brake_mode(additional_data)     { kdata.brake_mode      = Some(i); } }
+			DeviceState     => { if let Some(i) = Self::parse_device_state(additional_data)          { kdata.device_state    = Some(i); } }
+			InPowerRange    => { if let Some(i) = Self::parse_power_range(additional_data)           { kdata.power_range     = Some(i); } }
+			Pulse           => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.pulse           = Some(i); } }
+			Rpm             => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.rpm             = Some(i); } }
+			Online          => { if let Some(i) = Self::parse_bool_u8(additional_data)               { kdata.online          = Some(!i); } }
+			SpeedSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.speed_target    = Some(i); } }
+			SpeedGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.speed           = Some(i); } }
+			SpeedMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.speed_min       = Some(i); } }
+			SpeedMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.speed_max       = Some(i); } }
+			InclineSet      => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.incline_target  = Some(i); } }
+			InclineGet      => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.incline         = Some(i); } }
+			InclineMin      => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.incline_min     = Some(i); } }
+			InclineMax      => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.incline_max     = Some(i); } }
+			PowerSet        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.power_target    = Some(i); } }
+			PowerGet        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.power           = Some(i); } }
+			PowerMin        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.power_min       = Some(i); } }
+			PowerMax        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.power_max       = Some(i); } }
+			Distance        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.distance        = Some(i); } }
+			Energy          => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.energy          = Some(i); } }
+			Time            => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.time            = Some(i); } }
+			TimeMode        => { if let Some(i) = Self::parse_u16(additional_data)                   { kdata.time_mode       = Some(i); } }
+			BrakeLevel      => { if let Some(i) = Self::parse_u8(additional_data)                    { kdata.brake_level     = Some(i); } }
+			BrakeLevelMin   => { if let Some(i) = Self::parse_u8(additional_data)                    { kdata.brake_level_min = Some(i); } }
+			BrakeLevelMax   => { if let Some(i) = Self::parse_u8(additional_data)                    { kdata.brake_level_max = Some(i); } }
 			Speed /* deprecated */ => { println!("W: unexpected value {:?} received", value); }
 		}
 	}
@@ -621,31 +622,23 @@ enum KettlerHandlerMsg {
 	SendInstruction8(KettlerValue, KettlerInstruction, u8),
 	SendInstruction16(KettlerValue, KettlerInstruction, u16),
 	SetUpdateInterval(/* in milliseconds */ u32),
-	KdataRequest,
     Shutdown,
-}
-
-// KettlerHandler/EventLoop -> KettlerConnection
-enum ConnectionMsg {
-	Kdata(KettlerDeviceData),
 }
 
 struct KettlerHandler {
     socket: BtSocket,
-	send_channel: mpsc::Sender<ConnectionMsg>,
 	update_interval: u32,
 	kvalues_opt: Option<KettlerValues>,
 	data_manager: KettlerDataManager,
 }
 
 impl KettlerHandler {
-    fn new(socket: BtSocket, send_channel: mpsc::Sender<ConnectionMsg>, update_interval: u32) -> KettlerHandler {
+    fn new(socket: BtSocket, kdata_mutex: Arc<RwLock<KettlerDeviceData>>, update_interval: u32) -> KettlerHandler {
         KettlerHandler {
             socket: socket,
 			kvalues_opt: None,
-			send_channel: send_channel,
 			update_interval: update_interval,
-			data_manager: KettlerDataManager::new(),
+			data_manager: KettlerDataManager::new(kdata_mutex),
         }
     }
 
@@ -671,7 +664,10 @@ impl KettlerHandler {
 		ret.dynamic.append(&mut vec![Pulse, Distance, Energy, Time, TimeMode, Online, DeviceState]);
 		ret.static_values.append(&mut vec![DeviceName, DeviceId, DeviceType]);
 
-		let device_type = self.data_manager.kdata.device_type.expect("device type is not initialized");
+		let device_type = {
+			self.data_manager.kdata_mutex.read().unwrap().device_type.expect("device type is not initialized")
+			// lock goes out of scope
+		};
 		let (mut d, mut s) = match device_type {
 			Treadmill => (
 				vec![SpeedGet, SpeedSet, InclineGet, InclineSet],
@@ -705,8 +701,10 @@ impl KettlerHandler {
 		for &value in &kvalues.dynamic {
 			self.data_manager.send_instruction_u0(value, KettlerInstruction::Read);
 		}
+
+		let kdata: KettlerDeviceData = self.data_manager.kdata_mutex.read().unwrap().clone();
 		for &value in &kvalues.static_values {
-			if self.data_manager.kdata.is_value_initialized(value) { continue }
+			if kdata.is_value_initialized(value) { continue }
 			self.data_manager.send_instruction_u0(value, KettlerInstruction::Read);
 		}
 	}
@@ -746,7 +744,6 @@ impl mio::Handler for KettlerHandler {
             // KettlerHandlerMsg::SendInstruction0(value, instruction) => { self.send_instruction_u0(value, instruction); }
             KettlerHandlerMsg::SendInstruction8(value, instruction, additional_data) => { self.data_manager.send_instruction_u8(value, instruction, additional_data); }
             KettlerHandlerMsg::SendInstruction16(value, instruction, additional_data) => { self.data_manager.send_instruction_u16(value, instruction, additional_data); }
-			KettlerHandlerMsg::KdataRequest => { self.send_channel.send(ConnectionMsg::Kdata(self.data_manager.kdata.clone())).expect("sending kdata failed"); }
 			KettlerHandlerMsg::SetUpdateInterval(ms) =>  { self.update_interval = ms; }
             KettlerHandlerMsg::Shutdown => { event_loop.shutdown() }
         }
@@ -754,7 +751,8 @@ impl mio::Handler for KettlerHandler {
     }
 
     fn timeout(&mut self, event_loop: &mut EventLoop<Self>, _: Self::Timeout) {
-		if self.data_manager.kdata.device_type.is_none() {
+		let device_type = { self.data_manager.kdata_mutex.read().unwrap().device_type };
+		if device_type.is_none() {
 			self.data_manager.send_instruction_u0(KettlerValue::DeviceType, KettlerInstruction::Read);
 		} else {
 			// device type is known -> initialize value array
@@ -778,8 +776,7 @@ impl mio::Handler for KettlerHandler {
 /// all supported values for this device will follow.
 pub struct KettlerConnection {
     send_channel: mio::Sender<KettlerHandlerMsg>,
-	recv_channel: mpsc::Receiver<ConnectionMsg>,
-	kdata: KettlerDeviceData,
+	kdata_mutex: Arc<RwLock<KettlerDeviceData>>,
 	join_handle: Option<JoinHandle<()>>,
 	update_interval: u32,
 }
@@ -795,20 +792,20 @@ impl KettlerConnection {
 
     fn new(socket: BtSocket) -> KettlerConnection {
         // start blocking event loop in different thread but retain a channel for communication
+		let kdata_mutex = Arc::new(RwLock::new(KettlerDeviceData::default()));
+		let kdata_mutex2 = kdata_mutex.clone();
 		let update_interval = 100u32;
         let mut event_loop = EventLoop::<_>::new().expect("EventLoop::new() failed");
         let send_channel = event_loop.channel();
-		let (tx, recv_channel): (mpsc::Sender<ConnectionMsg>, mpsc::Receiver<ConnectionMsg>) = mpsc::channel();
         let join_handle = std::thread::spawn(move || {
 			event_loop.timeout_ms((), 10).expect("Registering first timer failed");
 			event_loop.register(&socket, Token(1), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).expect("Registering read event failed");
-            event_loop.run(&mut KettlerHandler::new(socket, tx, update_interval)).expect("EventLoop::run() failed");
+            event_loop.run(&mut KettlerHandler::new(socket, kdata_mutex2, update_interval)).expect("EventLoop::run() failed");
         });
 
         let connection = KettlerConnection {
             send_channel: send_channel,
-			recv_channel: recv_channel,
-			kdata: Default::default(),
+			kdata_mutex: kdata_mutex,
 			join_handle: Some(join_handle),
 			update_interval: update_interval,
         };
@@ -856,19 +853,6 @@ impl KettlerConnection {
         self.send_channel.send(msg).expect("Sending data to bluetooth socket thread failed (msg)");
     }
 
-	fn update(&mut self) {
-		self.send_message(KettlerHandlerMsg::KdataRequest);
-		match self.recv_channel.recv().expect("updating/receiving kettler device data from event loop failed") {
-			ConnectionMsg::Kdata(kdata) => self.kdata = kdata,
-		}
-	}
-
-	/*
-		Everything that has to be done before a value can be returned via "get_*()"...
-	*/
-	fn u(&mut self) {
-		self.update();
-	}
 
 	/// Documentation missing!
 	///
@@ -944,34 +928,34 @@ impl KettlerConnection {
 	/// Supported on all devices because it is a feature of the library.
 	pub fn set_update_interval(&mut self, v: u32)			{ self.update_interval = v; self.send_message(KettlerHandlerMsg::SetUpdateInterval(v)); }
 
-	pub fn get_power_target(&mut self) -> Option<u16>		                { self.u(); self.kdata.power_target }
-	pub fn get_power(&mut self) -> Option<u16>				                { self.u(); self.kdata.power }
-	pub fn get_power_min(&mut self) -> Option<u16>		                    { self.u(); self.kdata.power_min }
-	pub fn get_power_max(&mut self) -> Option<u16>		                    { self.u(); self.kdata.power_max }
-	pub fn get_speed_target(&mut self) -> Option<u16>				        { self.u(); self.kdata.speed_target }
-	pub fn get_speed(&mut self) -> Option<u16>				                { self.u(); self.kdata.speed }
-	pub fn get_speed_min(&mut self) -> Option<u16>			                { self.u(); self.kdata.speed_min }
-	pub fn get_speed_max(&mut self) -> Option<u16>			                { self.u(); self.kdata.speed_max }
-	pub fn get_incline_target(&mut self) -> Option<u16>				        { self.u(); self.kdata.incline_target }
-	pub fn get_incline(&mut self) -> Option<u16>			                { self.u(); self.kdata.incline }
-	pub fn get_incline_min(&mut self) -> Option<u16>		                { self.u(); self.kdata.incline_min }
-	pub fn get_incline_max(&mut self) -> Option<u16>		                { self.u(); self.kdata.incline_max }
-	pub fn get_brake_level(&mut self) -> Option<u8>			                { self.u(); self.kdata.brake_level }
-	pub fn get_brake_level_min(&mut self) -> Option<u8>		                { self.u(); self.kdata.brake_level_min }
-	pub fn get_brake_level_max(&mut self) -> Option<u8>		                { self.u(); self.kdata.brake_level_max }
-	pub fn get_online(&mut self) -> Option<bool>		                    { self.u(); self.kdata.online }
-	pub fn get_pulse(&mut self) -> Option<u16>		                        { self.u(); self.kdata.pulse }
-	pub fn get_rpm(&mut self) -> Option<u16>		                        { self.u(); self.kdata.rpm }
-	pub fn get_distance(&mut self) -> Option<u16>		                    { self.u(); self.kdata.distance }
-	pub fn get_energy(&mut self) -> Option<u16>		                        { self.u(); self.kdata.energy }
-	pub fn get_time(&mut self) -> Option<u16>		                        { self.u(); self.kdata.time }
-	pub fn get_time_mode(&mut self) -> Option<u16>		                    { self.u(); self.kdata.time_mode }
-	pub fn get_device_name(&mut self) -> Option<String>		                { self.u(); self.kdata.device_name.clone() }
-	pub fn get_device_id(&mut self) -> Option<String>		                { self.u(); self.kdata.device_id.clone() }
-	pub fn get_power_range(&mut self) -> Option<KettlerPowerRange>		    { self.u(); self.kdata.power_range }
-	pub fn get_device_type(&mut self) -> Option<KettlerDeviceType>		    { self.u(); self.kdata.device_type }
-	pub fn get_device_state(&mut self) -> Option<KettlerDeviceState>		{ self.u(); self.kdata.device_state }
-	pub fn get_brake_mode(&mut self) -> Option<KettlerBrakeMode>		    { self.u(); self.kdata.brake_mode }
+	pub fn get_power_target(&mut self) -> Option<u16>		                { self.kdata_mutex.read().unwrap().power_target }
+	pub fn get_power(&mut self) -> Option<u16>				                { self.kdata_mutex.read().unwrap().power }
+	pub fn get_power_min(&mut self) -> Option<u16>		                    { self.kdata_mutex.read().unwrap().power_min }
+	pub fn get_power_max(&mut self) -> Option<u16>		                    { self.kdata_mutex.read().unwrap().power_max }
+	pub fn get_speed_target(&mut self) -> Option<u16>				        { self.kdata_mutex.read().unwrap().speed_target }
+	pub fn get_speed(&mut self) -> Option<u16>				                { self.kdata_mutex.read().unwrap().speed }
+	pub fn get_speed_min(&mut self) -> Option<u16>			                { self.kdata_mutex.read().unwrap().speed_min }
+	pub fn get_speed_max(&mut self) -> Option<u16>			                { self.kdata_mutex.read().unwrap().speed_max }
+	pub fn get_incline_target(&mut self) -> Option<u16>				        { self.kdata_mutex.read().unwrap().incline_target }
+	pub fn get_incline(&mut self) -> Option<u16>			                { self.kdata_mutex.read().unwrap().incline }
+	pub fn get_incline_min(&mut self) -> Option<u16>		                { self.kdata_mutex.read().unwrap().incline_min }
+	pub fn get_incline_max(&mut self) -> Option<u16>		                { self.kdata_mutex.read().unwrap().incline_max }
+	pub fn get_brake_level(&mut self) -> Option<u8>			                { self.kdata_mutex.read().unwrap().brake_level }
+	pub fn get_brake_level_min(&mut self) -> Option<u8>		                { self.kdata_mutex.read().unwrap().brake_level_min }
+	pub fn get_brake_level_max(&mut self) -> Option<u8>		                { self.kdata_mutex.read().unwrap().brake_level_max }
+	pub fn get_online(&mut self) -> Option<bool>		                    { self.kdata_mutex.read().unwrap().online }
+	pub fn get_pulse(&mut self) -> Option<u16>		                        { self.kdata_mutex.read().unwrap().pulse }
+	pub fn get_rpm(&mut self) -> Option<u16>		                        { self.kdata_mutex.read().unwrap().rpm }
+	pub fn get_distance(&mut self) -> Option<u16>		                    { self.kdata_mutex.read().unwrap().distance }
+	pub fn get_energy(&mut self) -> Option<u16>		                        { self.kdata_mutex.read().unwrap().energy }
+	pub fn get_time(&mut self) -> Option<u16>		                        { self.kdata_mutex.read().unwrap().time }
+	pub fn get_time_mode(&mut self) -> Option<u16>		                    { self.kdata_mutex.read().unwrap().time_mode }
+	pub fn get_device_name(&mut self) -> Option<String>		                { self.kdata_mutex.read().unwrap().device_name.clone() }
+	pub fn get_device_id(&mut self) -> Option<String>		                { self.kdata_mutex.read().unwrap().device_id.clone() }
+	pub fn get_power_range(&mut self) -> Option<KettlerPowerRange>		    { self.kdata_mutex.read().unwrap().power_range }
+	pub fn get_device_type(&mut self) -> Option<KettlerDeviceType>		    { self.kdata_mutex.read().unwrap().device_type }
+	pub fn get_device_state(&mut self) -> Option<KettlerDeviceState>		{ self.kdata_mutex.read().unwrap().device_state }
+	pub fn get_brake_mode(&mut self) -> Option<KettlerBrakeMode>		    { self.kdata_mutex.read().unwrap().brake_mode }
 	pub fn get_update_interval(&mut self) -> u32							{ self.update_interval }
 
     pub fn close(&mut self) -> std::result::Result<(), String> {
