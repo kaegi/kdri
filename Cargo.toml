@@ -2,10 +2,15 @@
 name = "kdri"
 version = "0.4.0"
 authors = ["Chang Spivey <chang.spivey@gmail.com>"]
+description = "Library that lets you control Kettler devices via bluetooth"
+repository = "https://github.com/ChangSpivey/kdri"
+readme = "README.md"
+keywords = ["kettler", "bluetooth", "SPP", "RFCOMM", "remote"]
 build = "build.rs"
+license = "GPL-3.0"
 
 [dependencies]
-bluetooth-serial-port = { git = "https://github.com/ChangSpivey/bluetooth-serial-port.git" }
+bluetooth-serial-port = "0.2"
 mio = "0.5"
 enum_primitive = "0.1.0"
 
