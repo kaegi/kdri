@@ -784,7 +784,7 @@ impl KettlerConnection {
 
 	pub fn connect(addr: BtAddr) -> Result<KettlerConnection, String> {
 		let mut socket = try!(BtSocket::new(BtProtocol::RFCOMM).map_err(|e| e.to_string()));
-		try!(socket.connect_rfcomm(addr).map_err(|e| e.to_string()));
+		try!(socket.connect(addr).map_err(|e| e.to_string()));
 		let connection = KettlerConnection::new(socket);
 		connection.send_handshake();
 		Ok(connection)

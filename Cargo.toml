@@ -10,7 +10,7 @@ build = "build.rs"
 license = "GPL-3.0"
 
 [dependencies]
-bluetooth-serial-port = "0.2"
+bluetooth-serial-port = "0.3"
 mio = "0.5"
 enum_primitive = "0.1.0"
 
