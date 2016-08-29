@@ -149,7 +149,7 @@ enum KettlerValue {
 
 	BrakeLevel = 27,
 	BrakeLevelMin = 28,
-	BrakeLevelMax = 19,
+	BrakeLevelMax = 29,
 
 	InclineSet = 30,
 	InclineGet = 31,
