@@ -196,8 +196,8 @@ struct KettlerDeviceData {
 	rpm:             Option<u16>,
 	distance:        Option<u16>,
 	energy:          Option<u16>,
-	time:            Option<u16>, // TODO: verify data type
-	time_mode:       Option<u16>, // TODO: verify data type
+	time:            Option<u16>,
+	time_mode:       Option<u16>,
 	device_name:     Option<String>,
 	device_id:       Option<String>,
 	power_range:     Option<KettlerPowerRange>,
