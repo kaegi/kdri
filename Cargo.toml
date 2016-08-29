@@ -1,6 +1,6 @@
 [package]
 name = "kdri"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Chang Spivey <chang.spivey@gmail.com>"]
 description = "Library that lets you control Kettler devices via bluetooth"
 repository = "https://github.com/ChangSpivey/kdri"
