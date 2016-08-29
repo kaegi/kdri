@@ -40,6 +40,7 @@ fn main() {
             "power"           => { println!("power: {:?}", connection.get_power());},
             "power_min"       => { println!("power_min: {:?}", connection.get_power_min());},
             "power_max"       => { println!("power_max: {:?}", connection.get_power_max());},
+            "rpm"             => { println!("rpm: {:?}", connection.get_rpm());},
             "distance"        => { println!("distance: {:?}", connection.get_distance());},
             "energy"          => { println!("energy: {:?}", connection.get_energy());},
             "time"            => { println!("time: {:?}", connection.get_time());},
