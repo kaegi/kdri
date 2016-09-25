@@ -9,8 +9,8 @@ keywords = ["kettler", "bluetooth", "SPP", "RFCOMM", "remote"]
 license = "GPL-3.0"
 
 [dependencies]
-bluetooth-serial-port = "0.3"
-mio = "0.5"
+bluetooth-serial-port = "0.4"
+mio = "0.6"
 enum_primitive = "0.1.0"
 
 [lib]

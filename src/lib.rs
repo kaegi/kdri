@@ -41,8 +41,10 @@ pub use enum_primitive::FromPrimitive;
 use std::sync::{RwLock, Arc};
 use bluetooth_serial_port::{BtDevice, BtSocket, BtProtocol, BtError};
 use std::io::{Read, Write};
+use std::time::Duration;
 use std::thread::JoinHandle;
-use mio::*;
+use mio::deprecated::{EventLoop, Handler, Sender}; // TODO: replace mio::deprecated
+use mio::{Ready, PollOpt, Token};
 
 macro_rules! try_msg {
 	($e:expr, $m:expr) => {
@@ -643,8 +645,8 @@ impl KettlerHandler {
     }
 
     fn update_registration(&self, event_loop: &mut EventLoop<Self>) {
-		let mut event_set = EventSet::readable();
-		if self.data_manager.write_channel.len() > 0 { event_set = event_set | EventSet::writable(); }
+		let mut event_set = Ready::readable();
+		if self.data_manager.write_channel.len() > 0 { event_set = event_set | Ready::writable(); }
 		event_loop.reregister(&self.socket, Token(1), event_set, PollOpt::edge() | PollOpt::oneshot()).expect("Registering read event failed");
     }
 
@@ -710,11 +712,11 @@ impl KettlerHandler {
 	}
 }
 
-impl mio::Handler for KettlerHandler {
+impl Handler for KettlerHandler {
     type Timeout = ();
     type Message = KettlerHandlerMsg;
 
-    fn ready(&mut self, event_loop: &mut EventLoop<Self>, _: Token, events: EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<Self>, _: Token, events: Ready) {
         if events.is_readable() {
             match self.socket.read(&mut self.data_manager.read_buffer) {
                 Ok(num_bytes) => {
@@ -763,7 +765,7 @@ impl mio::Handler for KettlerHandler {
 		}
 
 		self.update_registration(event_loop);
-		event_loop.timeout_ms((), self.update_interval as u64).expect("Registering timer failed");
+		event_loop.timeout((), Duration::from_millis(self.update_interval as u64)).expect("Registering timer failed");
 	}
 }
 
@@ -775,7 +777,7 @@ impl mio::Handler for KettlerHandler {
 /// after connecting to the device, `DeviceType` will be requested and initialized, and then
 /// all supported values for this device will follow.
 pub struct KettlerConnection {
-    send_channel: mio::Sender<KettlerHandlerMsg>,
+    send_channel: Sender<KettlerHandlerMsg>,
 	kdata_mutex: Arc<RwLock<KettlerDeviceData>>,
 	join_handle: Option<JoinHandle<()>>,
 	update_interval: u32,
@@ -798,8 +800,8 @@ impl KettlerConnection {
         let mut event_loop = EventLoop::<_>::new().expect("EventLoop::new() failed");
         let send_channel = event_loop.channel();
         let join_handle = std::thread::spawn(move || {
-			event_loop.timeout_ms((), 10).expect("Registering first timer failed");
-			event_loop.register(&socket, Token(1), EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).expect("Registering read event failed");
+			event_loop.timeout((), Duration::from_millis(10)).expect("Registering first timer failed");
+			event_loop.register(&socket, Token(1), Ready::readable(), PollOpt::edge() | PollOpt::oneshot()).expect("Registering read event failed");
             event_loop.run(&mut KettlerHandler::new(socket, kdata_mutex2, update_interval)).expect("EventLoop::run() failed");
         });
 
